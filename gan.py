@@ -98,8 +98,8 @@ class DCGAN():
         h2 = tf.reshape(h2, [self.batch_size, -1])
         h2 = tf.concat(1, [h2, Y])
         h3 = lrelu( batchnormalize(tf.matmul(h2, self.discrim_W3 )))
-        h3 = tf.concat(1, [h3, Y])
-        return h3
+        out = tf.concat(1, [h3, Y])
+        return out
 
     def generate(self, Z, Y):
         yb = tf.reshape(Y, [self.batch_size, 1, 1, self.dim_y])
@@ -116,8 +116,8 @@ class DCGAN():
         h3 = tf.concat( 3, [h3, yb*tf.ones([self.batch_size, 14,14,self.dim_y])] )
 
         output_shape_l4 = [self.batch_size,28,28,self.dim_channel]
-        h4 = tf.nn.conv2d_transpose(h3, self.gen_W4, output_shape=output_shape_l4, strides=[1,2,2,1])
-        return h4
+        out = tf.nn.conv2d_transpose(h3, self.gen_W4, output_shape=output_shape_l4, strides=[1,2,2,1])
+        return out
 
     def samples_generator(self, batch_size):
         Z = tf.placeholder(tf.float32, [batch_size, self.dim_z])
@@ -145,13 +145,17 @@ def regen(visualize_dim):
     with open(FLAGS.load_samples, 'rb') as f_in:
         gen_samples = cPickle.load(f_in)
         for idx, sample_set in enumerate(gen_samples):
-            plot_generated(sample_set)
+            plot_generated(idx, sample_set, visualize_dim)
 
 def plot_generated(idx, generated, visualize_dim=196):
     shape = int(np.sqrt(visualize_dim))
-    fig, ax = plt.subplots(1, reconstruct_count, figsize=(1.2*reconstruct_count, 1.2*))
-    for index, im in enumerate(random.sample(generated, reconstruct_count)):
-        ax[index].imshow(np.reshape(im, (28, 28)))
+    fig, ax = plt.subplots(shape, shape, figsize=(1.2*shape, 1.2*shape))
+    for index, im in enumerate(generated):
+        if index < visualize_dim:
+            row, col = index // shape, index % shape
+            ax[row, col].imshow(np.reshape(im, (28, 28)))
+            ax[row, col].axis('off')
+    plt.suptitle('Epoch {}'.format(idx))
     plt.show()
 
 def save_model(sess, saver, gen_samples):
@@ -262,7 +266,7 @@ def model(visualize_dim, train=True):
                                                         Y_tf_sample:Y_np_sample})
                 gen_samples.append(generated_samples)
                 if FLAGS.plot:
-                    plot_generated(generated_samples)
+                    plot_generated(epoch, generated_samples, visualize_dim)
     save_model(sess, saver, gen_samples)
 
 if __name__ == '__main__':
@@ -289,7 +293,7 @@ if __name__ == '__main__':
                         help='Number of training epochs')
     parser.add_argument('--noise_dim', type=int, default=50, 
                         help='Dimension of noise input to generator')
-    parser.add_argument('--visualize_samples', type=int, default=196, 
+    parser.add_argument('--visualize_samples', type=int, default=100, 
                         help='Number of samples to plot each epoch')
 
     FLAGS = parser.parse_args()
@@ -297,8 +301,8 @@ if __name__ == '__main__':
     np.random.seed(1234)
     random.seed(1234)
     if FLAGS.load_samples:
-        regen(args.visualize_samples)
+        regen(FLAGS.visualize_samples)
     elif FLAGS.load_model:
-        model(args.visualize_samples, train=False)
+        model(FLAGS.visualize_samples, train=False)
     else:
-        model(args.visualize_samples)
+        model(FLAGS.visualize_samples)
